@@ -1,0 +1,19 @@
+function checkIV() {
+  var now = new Date();
+  if (now.getDay()!=0 && now.getDay()!=6) {
+    var year = now.getFullYear().toString();
+    var month = Utilities.formatDate(now, "IST", "MMM").toUpperCase();
+    var day = Utilities.formatDate(now, "IST", "dd").toString();
+    //var name = "18Mar2021.xlsx";
+    var name = day+month+year+".xlsx";  
+    var fileIter = DriveApp.getFilesByName(name);  
+    if (!fileIter.hasNext()) {
+      MailApp.sendEmail({
+        to: "pareshnagore@gmail.com",
+        subject: "IV file not found for today",
+        body: "File name: " + name + "\n" + "Date: "+ now
+      })
+      Logger.log("Reminder sent to pareshnagore@gmail.com");
+    } 
+  }
+}
