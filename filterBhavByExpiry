@@ -1,0 +1,77 @@
+function filterBhavByExpiry() {
+  
+  /// IMPORTANT!! - DEFINE THIS VARIABLE 
+  var DAYS_TO_GO_BACK = 0;
+  
+  var ss = SpreadsheetApp.openById("1aYefkxOtLMwygXqLD-oDyFKwx99XCyfAX58CNo-SRoM");
+  var sheet = ss.getActiveSheet();
+
+  // Date maninpulations
+  var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+  var now = new Date();
+  var exp = new Date(now.getTime() - DAYS_TO_GO_BACK*MILLIS_PER_DAY);
+  var format = Utilities.formatDate(exp, ss.getSpreadsheetTimeZone(), "dd-MMM-yyyy 00:00:00 Z"); 
+  var expDate = new Date(format);
+  var name = Utilities.formatDate(expDate, ss.getSpreadsheetTimeZone(), "dd-MMM-yyyy");
+  Logger.log(name);
+  Logger.log("Last row before: %d", sheet.getLastRow());
+
+  // Insert target temp sheet 
+  var tempSheet = ss.insertSheet(name);
+  
+  // Copy relevant ranges from main_sheet to temp_sheet
+  /*var i = 2;
+  while (i<=sheet.getLastRow()) {
+    var expCellValue = sheet.getRange(i, 3).getValue();
+    if (expCellValue == expDate.toString()) {
+      var srcRange = sheet.getRange(i, 1, 1, 16);
+      var last_ = tempSheet.getLastRow();
+      tempSheet.insertRowAfter(last_);
+      var targetRange = tempSheet.getRange(last_ +1, 1, 1, 16);
+      srcRange.copyTo(targetRange);
+      sheet.deleteRow(i);
+      count++;
+    } else {
+      i++;
+    }
+  }*/
+  
+  sheet.getDataRange().activate();
+  sheet.getDataRange().createFilter();
+  sheet.getRange('C1').activate();
+  var criteria = SpreadsheetApp.newFilterCriteria()
+  .whenDateEqualTo(new Date(exp.getFullYear(), exp.getMonth(), exp.getDate()))
+  .build();
+  sheet.getFilter().setColumnFilterCriteria(3, criteria);
+
+  sheet.getDataRange().copyTo(tempSheet.getRange(1, 1));
+  sheet.deleteRows(2, sheet.getLastRow()- 1);
+  sheet.getFilter().remove();
+
+  if (tempSheet.getLastRow()>1) {
+    // Create target file and move into folder
+    var bhavExpiryFolder = DriveApp.getFolderById("1ZULyJF0KTfx4xkyqW9D-FpG3lADndKtn");
+    var ss2 = SpreadsheetApp.create(name);
+    var ss2id = ss2.getId();
+    var fileToMove = DriveApp.getFileById(ss2id);
+    fileToMove.moveTo(bhavExpiryFolder);
+
+    // Copy temp_sheet to target file
+    tempSheet.copyTo(ss2);
+    ss2.getSheets()[1].setName(name);
+    ss2.deleteSheet(ss2.getSheets()[0]);
+    ss.deleteSheet(tempSheet);
+    Logger.log("Total rows moved: %d", ss2.getSheetByName(name).getDataRange().getNumRows()-1);
+    Logger.log("Last row after: %d", sheet.getLastRow());
+  } else {
+    ss.deleteSheet(tempSheet);
+    Logger.log("No data for expiry: %s", name);
+  }
+  
+  /*
+  var x = sheet.getRangeList(sheet.getDataRange().getValues().reduce(function(p, c, i) {
+          if (cnd(c, expDate)) p.push(i + 1 + ':' + (i + 1));
+          return p;
+        }, [])).activate().getRanges();
+  */
+}
