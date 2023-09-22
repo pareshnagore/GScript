@@ -1,0 +1,164 @@
+function prepareVol(){
+  var holidays = ["26-Jan-2023", "07-Mar-2023", "30-Mar-2023", "04-Apr-2023", "07-Apr-2023", "14-Apr-2023", "01-May-2023", "28-Jun-2023", "15-Aug-2023", "19-Sep-2023", "02-Oct-2023", "24-Oct-2023", "14-Nov-2023", "27-Nov-2023", "25-Dec-2023"];
+  var now = new Date();
+  var day = Utilities.formatDate(now, "IST", "dd-MMM-YYYY");
+  
+  if (now.getDay()!=0 && now.getDay()!=6 && holidays.indexOf(day)==-1) {
+    // Spreadsheet operations
+    var ss = SpreadsheetApp.openById("1pBq_cb89zVoUzc8gbFr4q39W87VR6_InaLbvtfRBJrk");
+    var volSheet = ss.getSheets()[0];
+    var dummySheet = ss.getSheets()[1];
+    var lastDateCell = volSheet.getRange(volSheet.getLastRow(), 1, 1, 1)
+    var lastDate = Utilities.formatDate(lastDateCell.getValue(), ss.getSpreadsheetTimeZone(), "dd-MMM-yy"); 
+    var vol5Range = volSheet.getRange(volSheet.getLastRow()-14, 1, 15, 9)
+    var vol5Data = vol5Range.getValues();
+    var currentData = dummySheet.getRange("A3:L3").getValues();
+    var currentVix = dummySheet.getRange("A5").getValues();
+    var date = Utilities.formatDate(now, ss.getSpreadsheetTimeZone(), "dd-MMM-yy");
+    Logger.log(vol5Data);
+    //Logger.log(lastDate);
+    //Logger.log(date);
+
+    if (date != lastDate) {
+      var niftyGkyz = Math.pow(Math.log(currentData[0][0]/vol5Data[12][6]), 2) + 0.5 * Math.pow(Math.log(currentData[0][1]/currentData[0][2]), 2) - (2*Math.log(2)-1)*(Math.pow(Math.log(currentData[0][3]/currentData[0][0]), 2));
+      var bnGkyz = Math.pow(Math.log(currentData[0][4]/vol5Data[13][6]), 2) + 0.5 * Math.pow(Math.log(currentData[0][5]/currentData[0][6]), 2) - (2*Math.log(2)-1)*(Math.pow(Math.log(currentData[0][7]/currentData[0][4]), 2));
+      var fnGkyz = Math.pow(Math.log(currentData[0][8]/vol5Data[14][6]), 2) + 0.5 * Math.pow(Math.log(currentData[0][9]/currentData[0][10]), 2) - (2*Math.log(2)-1)*(Math.pow(Math.log(currentData[0][11]/currentData[0][8]), 2));
+
+      var niftyVol = Math.sqrt((niftyGkyz + vol5Data[12][7] + vol5Data[9][7] + vol5Data[6][7] + vol5Data[3][7])*52)*100;
+      var bnVol = Math.sqrt((bnGkyz + vol5Data[13][7] + vol5Data[10][7] + vol5Data[7][7] + vol5Data[4][7])*52)*100;
+      var fnVol = Math.sqrt((fnGkyz + vol5Data[14][7] + vol5Data[11][7] + vol5Data[8][7] + vol5Data[5][7])*52)*100;
+
+      var dataArray = [
+      [date, "NIFTY", currentVix[0][0], currentData[0][0], currentData[0][1], currentData[0][2], currentData[0][3], niftyGkyz, niftyVol],
+      [date, "BANKNIFTY", currentVix[0][0], currentData[0][4], currentData[0][5], currentData[0][6], currentData[0][7], bnGkyz, bnVol],
+      [date, "FINNIFTY", currentVix[0][0], currentData[0][8], currentData[0][9], currentData[0][10], currentData[0][11], fnGkyz, fnVol] ];
+
+      vol5Range.copyFormatToRange(1066989090, 1, 9, volSheet.getLastRow()+1, volSheet.getLastRow()+3);
+      var dataRange = volSheet.getRange(volSheet.getLastRow()+1, 1, 3, 9);
+      dataRange.setValues(dataArray);
+      Logger.log(dataArray);
+    }
+    else {
+      Logger.log("Record for today already exists");
+    }
+  }
+  else {
+    Logger.log("Today is %s", Utilities.formatDate(now, "IST", "EEEE"));
+  }
+  
+}
+
+function checkBhavDownload(){
+  var ss = SpreadsheetApp.openById("1aYefkxOtLMwygXqLD-oDyFKwx99XCyfAX58CNo-SRoM");  // Open 'Bhavcopy' file
+  var sheet = ss.getActiveSheet();
+  var data = sheet.getRange(sheet.getLastRow()-4, 1, 5, 16).getValues();
+
+  /*var expiryData = sheet.getRange(2, 3, sheet.getLastRow()).getValues();
+  var ar = Array.prototype.concat.apply([], expiryData);
+  var minExp = Math.min.apply(null, ar);*/
+
+  var rows = sheet.getDataRange().getNumRows();
+  var columns = sheet.getDataRange().getNumColumns();
+  Logger.log("Sheet Utilization: %d %", (rows*columns/5000000*100).toFixed(2));
+  // Logger.log("Approximate %d days of data stored", (rows/1600).toFixed(2));
+  Logger.log("Last row number %d", sheet.getLastRow());
+  Logger.log(data);
+}
+
+function deleteLastBhav() {
+  // Comment next line after run
+   var rowsToDelete = 2245;
+  var ss = SpreadsheetApp.openById("1aYefkxOtLMwygXqLD-oDyFKwx99XCyfAX58CNo-SRoM");
+  var sheet = ss.getActiveSheet();
+  sheet.deleteRows(sheet.getLastRow()-rowsToDelete+1, rowsToDelete);
+  var lastRow = sheet.getLastRow();
+  Logger.log(lastRow);  
+}
+
+function createBhavBackup() {
+  var fileIter = DriveApp.getFilesByName("Bhavcopy-Backup");
+  while (fileIter.hasNext()) {
+    //DriveApp.removeFile(fileIter.next());
+    fileIter.next().setTrashed(true);
+  }
+  var ss = SpreadsheetApp.openById("1aYefkxOtLMwygXqLD-oDyFKwx99XCyfAX58CNo-SRoM");
+  ss.copy("Bhavcopy-Backup");
+}
+
+function filterBhavByExpiry() {
+  
+  /// IMPORTANT!! - DEFINE THIS VARIABLE 
+  var DAYS_TO_GO_BACK = 0;
+  
+  var ss = SpreadsheetApp.openById("1aYefkxOtLMwygXqLD-oDyFKwx99XCyfAX58CNo-SRoM");
+  var sheet = ss.getActiveSheet();
+
+  // Date maninpulations
+  var MILLIS_PER_DAY = 1000 * 60 * 60 * 24;
+  var now = new Date();
+  var exp = new Date(now.getTime() - DAYS_TO_GO_BACK*MILLIS_PER_DAY);
+  var format = Utilities.formatDate(exp, ss.getSpreadsheetTimeZone(), "dd-MMM-yyyy 00:00:00 Z"); 
+  var expDate = new Date(format);
+  var name = Utilities.formatDate(expDate, ss.getSpreadsheetTimeZone(), "dd-MMM-yyyy");
+  Logger.log(name);
+  Logger.log("Last row before: %d", sheet.getLastRow());
+
+  // Insert target temp sheet 
+  var tempSheet = ss.insertSheet(name);
+  
+  // Copy relevant ranges from main_sheet to temp_sheet
+  /*var i = 2;
+  while (i<=sheet.getLastRow()) {
+    var expCellValue = sheet.getRange(i, 3).getValue();
+    if (expCellValue == expDate.toString()) {
+      var srcRange = sheet.getRange(i, 1, 1, 16);
+      var last_ = tempSheet.getLastRow();
+      tempSheet.insertRowAfter(last_);
+      var targetRange = tempSheet.getRange(last_ +1, 1, 1, 16);
+      srcRange.copyTo(targetRange);
+      sheet.deleteRow(i);
+      count++;
+    } else {
+      i++;
+    }
+  }*/
+  
+  sheet.getDataRange().activate();
+  sheet.getDataRange().createFilter();
+  sheet.getRange('C1').activate();
+  var criteria = SpreadsheetApp.newFilterCriteria()
+  .whenDateEqualTo(new Date(exp.getFullYear(), exp.getMonth(), exp.getDate()))
+  .build();
+  sheet.getFilter().setColumnFilterCriteria(3, criteria);
+
+  sheet.getDataRange().copyTo(tempSheet.getRange(1, 1));
+  sheet.deleteRows(2, sheet.getLastRow()- 1);
+  sheet.getFilter().remove();
+
+  if (tempSheet.getLastRow()>1) {
+    // Create target file and move into folder
+    var bhavExpiryFolder = DriveApp.getFolderById("1ZULyJF0KTfx4xkyqW9D-FpG3lADndKtn");
+    var ss2 = SpreadsheetApp.create(name);
+    var ss2id = ss2.getId();
+    var fileToMove = DriveApp.getFileById(ss2id);
+    fileToMove.moveTo(bhavExpiryFolder);
+
+    // Copy temp_sheet to target file
+    tempSheet.copyTo(ss2);
+    ss2.getSheets()[1].setName(name);
+    ss2.deleteSheet(ss2.getSheets()[0]);
+    ss.deleteSheet(tempSheet);
+    Logger.log("Total rows moved: %d", ss2.getSheetByName(name).getDataRange().getNumRows()-1);
+    Logger.log("Last row after: %d", sheet.getLastRow());
+  } else {
+    ss.deleteSheet(tempSheet);
+    Logger.log("No data for expiry: %s", name);
+  }
+  
+  /*
+  var x = sheet.getRangeList(sheet.getDataRange().getValues().reduce(function(p, c, i) {
+          if (cnd(c, expDate)) p.push(i + 1 + ':' + (i + 1));
+          return p;
+        }, [])).activate().getRanges();
+  */
+}
