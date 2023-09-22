@@ -1,0 +1,36 @@
+function checkBhavDownload(){
+  var ss = SpreadsheetApp.openById("1aYefkxOtLMwygXqLD-oDyFKwx99XCyfAX58CNo-SRoM");  // Open 'Bhavcopy' file
+  var sheet = ss.getActiveSheet();
+  var data = sheet.getRange(sheet.getLastRow()-4, 1, 5, 16).getValues();
+
+  /*var expiryData = sheet.getRange(2, 3, sheet.getLastRow()).getValues();
+  var ar = Array.prototype.concat.apply([], expiryData);
+  var minExp = Math.min.apply(null, ar);*/
+
+  var rows = sheet.getDataRange().getNumRows();
+  var columns = sheet.getDataRange().getNumColumns();
+  Logger.log("Sheet Utilization: %d %", (rows*columns/5000000*100).toFixed(2));
+  // Logger.log("Approximate %d days of data stored", (rows/1600).toFixed(2));
+  Logger.log("Last row number %d", sheet.getLastRow());
+  Logger.log(data);
+}
+
+function deleteLastBhav() {
+  // Comment next line after run
+   var rowsToDelete = 2245;
+  var ss = SpreadsheetApp.openById("1aYefkxOtLMwygXqLD-oDyFKwx99XCyfAX58CNo-SRoM");
+  var sheet = ss.getActiveSheet();
+  sheet.deleteRows(sheet.getLastRow()-rowsToDelete+1, rowsToDelete);
+  var lastRow = sheet.getLastRow();
+  Logger.log(lastRow);  
+}
+
+function createBhavBackup() {
+  var fileIter = DriveApp.getFilesByName("Bhavcopy-Backup");
+  while (fileIter.hasNext()) {
+    //DriveApp.removeFile(fileIter.next());
+    fileIter.next().setTrashed(true);
+  }
+  var ss = SpreadsheetApp.openById("1aYefkxOtLMwygXqLD-oDyFKwx99XCyfAX58CNo-SRoM");
+  ss.copy("Bhavcopy-Backup");
+}
