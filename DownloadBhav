@@ -1,0 +1,88 @@
+
+function downloadBhav(){
+  
+  var holidays = ["26-Jan-2023", "07-Mar-2023", "30-Mar-2023", "04-Apr-2023", "07-Apr-2023", "14-Apr-2023", "01-May-2023", "28-Jun-2023", "15-Aug-2023", "19-Sep-2023", "02-Oct-2023", "24-Oct-2023", "14-Nov-2023", "27-Nov-2023", "25-Dec-2023"];
+  // Make URL
+  var now = new Date();
+  var holday = Utilities.formatDate(now, "IST", "dd-MMM-YYYY");
+  var year = now.getFullYear().toString();
+  var month = Utilities.formatDate(now, "IST", "MMM").toUpperCase();
+  var day = Utilities.formatDate(now, "IST", "dd").toString();
+  //var fetchurl = "https://archives.nseindia.com/content/historical/DERIVATIVES/2023/SEP/fo21SEP2023bhav.csv.zip";
+  var fetchurl = "https://archives.nseindia.com/content/historical/DERIVATIVES/" + year + "/" + month + "/fo" + day+month+year + "bhav.csv.zip";                                                                      // Prepare bhavcopy url 
+  //var name = "21Sep2023.xlsx";
+  var name = day+month+year+".xlsx";                                                 // Prepare name of file in 'Options IV' folder
+  Logger.log(fetchurl);
+
+  if (now.getDay()!=0 && now.getDay()!=6 && holidays.indexOf(holday)==-1) {
+    // Make a GET request, set zip file type, Unzip the file, read the csv file as string, convert string to array and filter array
+    var response = UrlFetchApp.fetch(fetchurl, {muteHttpExceptions: true, followRedirects: false});
+    if (response.getResponseCode() == 200) {
+      var blobfile = response.getBlob();
+      var zippy = blobfile.setContentType("application/zip");//response.getAs("application/zip");
+      var csvv = Utilities.unzip(zippy);
+      var file = csvv[0].getDataAsString();
+      var dataArray = Utilities.parseCsv(file).filter(
+        x => (x[12]!= 0 && x[10]>1 && (x[0]=="OPTIDX" || x[0]=="FUTIDX" || x[0]=="FUTSTK") && (x[1]!="FINNIFTY") && (x[1]!="MIDCPNIFTY"))
+      ); // Filter bhavcopy data to get non-zero OI and greater than 1 volume and with non-OPTSTK instrument & non-finnifty
+
+      // Drive operations
+      var fileIter = DriveApp.getFilesByName(name);                                       // Get name of IV files
+      while (fileIter.hasNext()){                                                         // If file exists then
+        var file = fileIter.next();
+        Logger.log(file.getName())
+        var sourceblob = file.getBlob();
+        var resource = {title: file.getName().replace(/.xlsx?/, "")};                     // Convet xlsx file to google sheet
+        resource.title = "temp";
+        var sourceSpreadsheet = Drive.Files.insert(resource, sourceblob, {convert: true});// Get that google sheet
+        var sourceSheet = SpreadsheetApp.openById(sourceSpreadsheet.id).getSheets()[0];
+        var sourceValues = sourceSheet.getDataRange().getValues();                        // Read values
+        //Drive.Files.remove(sourceSpreadsheet.id);
+        DriveApp.getFileById(sourceSpreadsheet.id).setTrashed(true);                      // Delete temp sheet file created above
+        
+        // Set up IV values in the original dataArray
+        var tempArray = [];
+        //x = strike, expiry, peIV, ceIV, symbol
+        for (var i=0; i<dataArray.length; i++){      // Loop over bhavcopy values to map IV values from file to bhavcopy dataArray
+          if (dataArray[i][0]=="OPTIDX"){
+            tempArray = sourceValues.filter(x => (x[4]==dataArray[i][1] && x[0]==dataArray[i][3] && x[1]==dataArray[i][2]));
+            //Logger.log(tempArray);
+            if (dataArray[i][4] == 'CE' && 0<tempArray.length) {
+              dataArray[i][15] = tempArray[0][3]
+            }
+            if (dataArray[i][4] == 'PE' && 0<tempArray.length) {
+              dataArray[i][15] = tempArray[0][2]
+            }
+            //Logger.log(dataArray[i]);
+          }
+        }
+      }
+      // Spreadsheet operations, append to sheet
+      var ss2 = SpreadsheetApp.openById("1aYefkxOtLMwygXqLD-oDyFKwx99XCyfAX58CNo-SRoM");  // Open 'Bhavcopy' file
+      var sheet = ss2.getActiveSheet();
+      var dataRange = sheet.getRange(sheet.getLastRow()+1, 1, dataArray.length, 16);      // Select range ahead of existing values
+      dataRange.setValues(dataArray);                                                     // Set values in the range
+      Logger.log("Successfully added %s entries", dataArray.length);
+    }
+    else {
+      Logger.log("Error in fetching url");
+      Logger.log(response.getResponseCode());
+      Logger.log("Date: %s", Utilities.formatDate(now, "IST", "dd MMM YYYY"));
+      Logger.log("Day: %s", Utilities.formatDate(now, "IST", "EEEE"));
+      if (response.getResponseCode() == 403) {
+        Logger.log("Access Denied");
+      }
+      if (response.getResponseCode() == 302) {
+        Logger.log("URL temporarily moved, try manually after some time");
+      }
+      MailApp.sendEmail({
+        to: "pareshnagore@gmail.com",
+        subject: "DownloadBhav Failed",
+        body: "Unable to download bhavcopy on " + " due to errorcode: " + response.getResponseCode()
+      })
+    }
+  }
+  else {
+    Logger.log("Today is %s", Utilities.formatDate(now, "IST", "EEEE"));
+  }
+}
